@@ -1,0 +1,107 @@
+title: this is mplus code to conduct multilevel rsa
+       
+       here we compute the conditional response surface 
+       parameters including their standard errors 
+       for g = -1 or g = 1
+
+       variable names:
+       grID = id for level 2 units
+       pID = id for level 1 units
+       x = the first predictor ('real age')
+       y = the second predictor ('felt age')
+       x2 = squared x
+       xy = interaction x and y
+       y2 = squared y
+       xm - y2m are the level 2 means of x - y2
+       g = the level 2 moderator ('spirituality')
+       z = the outcome ('satisfaction')
+
+       important:
+       the data has to be prepared using the 
+       PrepareData.r file prior to using the mplus
+       codes
+       
+       mplus cannot, as far as we know, be used to compute the
+       regions of significance, this has to be done in R; 
+
+data: file is Fakedata_Mplus.dat; ! the data file
+variable: ! the variables in the order they are saved 
+          ! in the mplus file
+          names are grID pID x y x2 xy y2
+                    xm ym x2m xym y2m g z;
+          ! say mplus which variables to use
+          ! in the following analysis          
+          usevariables are grID x y x2 xy
+                    y2 xm ym x2m xym y2m z g;
+          ! mplus needs a variable defining the
+          ! level 2 units (called cluster-variable)
+          cluster = grID;
+          ! say mplus which variables (except the outcome)
+          ! is a level 1 variable
+          within are x y x2 xy y2;
+          ! say mplus which variable are pure level 2 
+          ! variables; in contrast to the other file
+          ! the list contains g now
+          between are xm ym x2m xym y2m g;
+analysis: ! use the standard estimator in mplus (ML-robust)
+          type = twolevel random;
+model: ! define the model to be estimated
+    %within%
+    ! regression of z on x, the slope is called b1
+    ! the same for the other predictors
+    b1 | z on x;
+    b2 | z on y;
+    b3 | z on x2;
+    b4 | z on xy;
+    b5 | z on y2;
+    %between%
+    ! mplus automatically calls the intercept on level 2 as the 
+    ! outcome variable predicted in the level 1 model; here z
+    ! so the following line defines a regressions in which the means
+    ! are used to predict the intercept (see Equation 11, first line)
+    z on xm ym x2m xym y2m;
+    ! furthermore, the intercept and slopes ae predicted by g
+    ! and we call the coefficients in accordance with Equation 15
+    z  on g (gamma01);
+    b1 on g (gamma11); 
+    b2 on g (gamma21);
+    b3 on g (gamma31);
+    b4 on g (gamma41);
+    b5 on g (gamma51);
+    ! get estimates of gamma00 to gamma50
+    [z]  (gamma00);
+    [b1] (gamma10);
+    [b2] (gamma20);
+    [b3] (gamma30);
+    [b4] (gamma40);
+    [b5] (gamma50);
+    ! again, we estimate the full random effect structure by defining 
+    ! all correlations between the random effects
+    z with b1 b2 b3 b4 b5;
+    b1 with b2 b3 b4 b5;
+    b2 with b3 b4 b5;
+    b3 with b4 b5;
+    b4 with b5;
+    ! estimate the variances of the intercepts and the slopes
+    z;
+    b1-b5;
+model constraint:
+   ! estimate the conditional response surface parameters 
+   ! for a low value of g (g = -1) and a high value (g = 1)
+   ! altogether these are ten variables 
+   new(a1_low a2_low a3_low a4_low a5_low
+       a1_hig a2_hig a3_hig a4_hig a5_hig);
+   ! define the five variables
+   ! see Table 5 in the article
+   ! mplus automatically computes the standard errors
+   a1_low = (gamma10+gamma20)+(gamma11+gamma21)*(-1);
+   a2_low = (gamma30+gamma40+gamma50)+(gamma31+gamma41+gamma51)*(-1);
+   a3_low = (gamma10-gamma20)+(gamma11-gamma21)*(-1);
+   a4_low = (gamma30-gamma40+gamma50)+(gamma31-gamma41+gamma51)*(-1);
+   a5_low = (gamma30-gamma50)+(gamma31-gamma51)*(-1);
+   a1_hig = (gamma10+gamma20)+(gamma11+gamma21)*(1);
+   a2_hig = (gamma30+gamma40+gamma50)+(gamma31+gamma41+gamma51)*(1);
+   a3_hig = (gamma10-gamma20)+(gamma11-gamma21)*(1);
+   a4_hig = (gamma30-gamma40+gamma50)+(gamma31-gamma41+gamma51)*(1);
+   a5_hig = (gamma30-gamma50)+(gamma31-gamma51)*(1);
+output: tech1, tech3, cinterval;
